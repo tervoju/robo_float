@@ -79,6 +79,52 @@
                 }
               }
             }
+          },
+          "CANReader": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "${MODULES.CANReader.debug}",
+              "createOptions": {
+                "ExposedPorts": {
+                  "5678/tcp": {}
+                },
+                "HostConfig": {
+                  "PortBindings": {
+                    "5678/tcp": [
+                      {
+                        "HostPort": "5678"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "CANDataHandler": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "${MODULES.CANDataHandler.debug}",
+              "createOptions": {
+                "ExposedPorts": {
+                  "5678/tcp": {}
+                },
+                "HostConfig": {
+                  "PortBindings": {
+                    "5678/tcp": [
+                      {
+                        "HostPort": "5678"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -87,7 +133,9 @@
       "properties.desired": {
         "schemaVersion": "1.0",
         "routes": {
-          "GPSReaderToIoTHub": "FROM /messages/modules/GPSReader/outputs/* INTO $upstream"
+          "GPSReaderToIoTHub": "FROM /messages/modules/GPSReader/outputs/* INTO $upstream",
+          "CANReaderToIoTHub": "FROM /messages/modules/CANReader/outputs/* INTO $upstream",
+          "CANDataHandlerToIoTHub": "FROM /messages/modules/CANDataHandler/outputs/* INTO $upstream"
         },
         "storeAndForwardConfiguration": {
           "timeToLiveSecs": 7200

@@ -14,11 +14,6 @@
                 "username": "$CONTAINER_REGISTRY_USERNAME_floats",
                 "password": "$CONTAINER_REGISTRY_PASSWORD_floats",
                 "address": "floats.azurecr.io"
-              },
-              "lfloats": {
-                "username": "$CONTAINER_REGISTRY_USERNAME_lfloats",
-                "password": "$CONTAINER_REGISTRY_PASSWORD_lfloats",
-                "address": "lfloats.azurecr.io"
               }
             }
           }
@@ -75,30 +70,6 @@
                 }
               }
             }
-          },
-          "CANReader": {
-            "version": "1.0",
-            "type": "docker",
-            "status": "running",
-            "restartPolicy": "always",
-            "settings": {
-              "image": "${MODULES.CANReader}",
-              "createOptions": {
-                "HostConfig": {
-                  "Privileged": true
-                }
-              }
-            }
-          },
-          "CANDataHandler": {
-            "version": "1.0",
-            "type": "docker",
-            "status": "running",
-            "restartPolicy": "always",
-            "settings": {
-              "image": "${MODULES.CANDataHandler}",
-              "createOptions": {}
-            }
           }
         }
       }
@@ -107,9 +78,7 @@
       "properties.desired": {
         "schemaVersion": "1.0",
         "routes": {
-          "GPSReaderToIoTHub": "FROM /messages/modules/GPSReader/outputs/* INTO $upstream",
-          "CANReaderToCANDataHandler": "FROM /messages/modules/CANReader/outputs/CANoutput INTO BrokeredEndpoint(\"/modules/CANDataHandler/inputs/input1\")",
-          "CANDataHandlerToIoTHub": "FROM /messages/modules/CANDataHandler/outputs/* INTO $upstream"
+          "GPSReaderToIoTHub": "FROM /messages/modules/GPSReader/outputs/* INTO $upstream"
         },
         "storeAndForwardConfiguration": {
           "timeToLiveSecs": 7200

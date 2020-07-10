@@ -18,7 +18,10 @@ from azure.iot.device import Message
 import pynmea2
 import serial
 
-gps_port = "/dev/ttyACM0"
+import ptvsd
+ptvsd.enable_attach(('0.0.0.0',  5678))
+
+gps_port = "/dev/ttyGPS"
 
 async def main():
     try:
