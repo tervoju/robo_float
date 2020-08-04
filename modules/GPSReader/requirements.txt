@@ -1,3 +1,4 @@
 azure-iot-device~=2.0.0
 pyserial~=3.4
 pynmea2~=1.15.0
+pyudev~=0.22.0

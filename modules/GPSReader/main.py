@@ -18,7 +18,44 @@ from azure.iot.device import Message
 import pynmea2
 import serial
 
-gps_port = "/dev/ttyACM0"
+import pyudev
+
+# for example
+GPS_DEVICE_VENDOR = '1546'
+GPS_DEVICE_ID = '01a8'
+
+gps_port = ""
+
+
+def is_usb_serial(device, vid=None, pid=None):
+    """Checks device to see if its a USB Serial device.
+    The caller already filters on the subsystem being 'tty'.
+    If serial_num or vendor is provided, then it will further check to
+    see if the serial number and vendor of the device also matches.
+    """
+
+    # cannot be right if no vendor id
+    if 'ID_VENDOR' not in device.properties:
+        return False
+    # searcing for right vendor
+    if vid is not None:
+        if device.properties['ID_VENDOR_ID'] != vid:
+            print(vid + ' not found  ' + device.properties['ID_VENDOR_ID'])
+            return False
+
+    if pid is not None:
+        if device.properties['ID_MODEL_ID'] != pid:
+            print('not found')
+            return False
+    return True
+
+def list_devices(vid=None, pid=None):
+    devs = []
+    context = pyudev.Context()
+    for device in context.list_devices(subsystem='tty'):
+        if is_usb_serial(device, vid= vid,  pid = pid):
+            devs.append(device.device_node)
+    return devs
 
 async def main():
     try:
@@ -33,6 +70,7 @@ async def main():
         await module_client.connect()
 
         # define behavior for halting the application
+
         def stdin_listener():
             while True:
                 try:
@@ -45,7 +83,7 @@ async def main():
 
         async def receiveGPS(module_client, ser):
             while True:
-                try: 
+                try:
                     await asyncio.sleep(60)
 
                     gps_data = None
@@ -73,16 +111,29 @@ async def main():
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     }
 
-                    payload = Message(json.dumps(data), content_encoding="utf-8", content_type="application/json")
-                    payload.custom_properties["type"] = "location" # needed for routing message to event grid
+                    payload = Message(json.dumps(
+                        data), content_encoding="utf-8", content_type="application/json")
+                    # needed for routing message to event grid
+                    payload.custom_properties["type"] = "location"
                     await module_client.send_message_to_output(payload, "output1")
 
                 except Exception as e:
                     print("no GPS data available: %s" % e)
                     await asyncio.sleep(10)
+        #define port for 
+        try:
+            GPS_PORTS = list_devices(GPS_DEVICE_VENDOR, GPS_DEVICE_ID)
+            print(GPS_PORTS)
+            if GPS_PORTS == []:
+                print('No GPS DEVICE FOUND')
+                raise Exception("No GPS: %s" % GPS_DEVICE_VENDOR)
 
-        # GPS receiver
-        gps_ser = serial.Serial(gps_port, baudrate=9600, timeout=0.5)
+            #first found GPS device
+            gps_port = GPS_PORTS[0]
+
+            # GPS receiver
+            gps_ser = serial.Serial(gps_port, baudrate=9600, timeout=0.5)
+        
 
         # Schedule task for C2D Listener
         listeners = asyncio.gather(receiveGPS(module_client, gps_ser))
@@ -107,4 +158,4 @@ async def main():
 
 if __name__ == "__main__":
     # If using Python 3.7 or above, you can use following code instead:
-     asyncio.run(main())
+    asyncio.run(main())
