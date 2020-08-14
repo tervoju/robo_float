@@ -7,6 +7,7 @@ import os
 import sys
 import asyncio
 import json
+import pprint
 from datetime import datetime
 from datetime import timezone
 
@@ -20,19 +21,20 @@ import serial
 
 import pyudev
 
-# for example
+# import ptvsd
+# ptvsd.enable_attach(('192.168.8.103',  5678))
+
+# for example GPS vendor and device ublox GPS receiver
 GPS_DEVICE_VENDOR = '1546'
 GPS_DEVICE_ID = '01a8'
 
-gps_port = ""
-
-
 def is_usb_serial(device, vid=None, pid=None):
-    """Checks device to see if its a USB Serial device.
-    The caller already filters on the subsystem being 'tty'.
-    If serial_num or vendor is provided, then it will further check to
-    see if the serial number and vendor of the device also matches.
-    """
+    # Checks device to see if its a USB Serial device.
+    # The caller already filters on the subsystem being 'tty'.
+    # If serial_num or vendor is provided, then it will further check to
+    # see if the serial number and vendor of the device also matches.
+
+    #pprint.pprint(dict(device.properties))
 
     # cannot be right if no vendor id
     if 'ID_VENDOR' not in device.properties:
@@ -70,7 +72,6 @@ async def main():
         await module_client.connect()
 
         # define behavior for halting the application
-
         def stdin_listener():
             while True:
                 try:
@@ -82,58 +83,50 @@ async def main():
                     time.sleep(10)
 
         async def receiveGPS(module_client, ser):
+            # ptvsd.break_into_debugger()
+            gps_message_types = ["$GNRMC", "$GPRMC", "$GLRMC", "$GARMC"]
+
             while True:
-                try:
+                try: 
+                    data = ser.readline().decode('ascii', errors='replace')
+                    data = data.strip()
+
+                    if len(data) > 6 and data[0:6] in gps_message_types:
+                        gps_data = pynmea2.parse(data)
+                    
+                        msg = {
+                            "latitude": gps_data.latitude,
+                            "longitude": gps_data.longitude,
+                            "lat_dir": gps_data.lat_dir,
+                            "lon_dir": gps_data.lon_dir,
+                            "speed": gps_data.spd_over_grnd,
+                            "deviceId": os.environ["IOTEDGE_DEVICEID"],
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        }
+
+                        payload = Message(json.dumps(msg), content_encoding="utf-8", content_type="application/json")
+                        payload.custom_properties["type"] = "location" # needed for routing message to event grid
+
+                        await module_client.send_message_to_output(payload, "output1")
+                        
                     await asyncio.sleep(60)
 
-                    gps_data = None
-                    found = False
-
-                    while not found:
-                        data = ser.readline()
-                        if data[0:6] == "$GPRMC":
-                            gps_data = data
-                            found = True
-
-                    try:
-                        gps_data = pynmea2.parse(data)
-                    except pynmea2.ParseError as e:
-                        print('Parse error: {}'.format(e))
-                        continue
-
-                    data = {
-                        "latitude": gps_data.latitude,
-                        "longitude": gps_data.longitude,
-                        "lat_dir": gps_data.lat_dir,
-                        "lon_dir": gps_data.lon_dir,
-                        "speed": gps_data.spd_over_grnd,
-                        "deviceId": os.environ["IOTEDGE_DEVICEID"],
-                        "timestamp": datetime.now(timezone.utc).isoformat()
-                    }
-
-                    payload = Message(json.dumps(
-                        data), content_encoding="utf-8", content_type="application/json")
-                    # needed for routing message to event grid
-                    payload.custom_properties["type"] = "location"
-                    await module_client.send_message_to_output(payload, "output1")
-
                 except Exception as e:
-                    print("no GPS data available: %s" % e)
+                    print("GPS reader errored: %s" % e)
                     await asyncio.sleep(10)
-        #define port for 
-        try:
-            GPS_PORTS = list_devices(GPS_DEVICE_VENDOR, GPS_DEVICE_ID)
-            print(GPS_PORTS)
-            if GPS_PORTS == []:
-                print('No GPS DEVICE FOUND')
-                raise Exception("No GPS: %s" % GPS_DEVICE_VENDOR)
 
-            #first found GPS device
-            gps_port = GPS_PORTS[0]
+        # define port for GPS USB module
+        gps_port = "/dev/ttyGPS"
+        GPS_PORTS = list_devices(GPS_DEVICE_VENDOR, GPS_DEVICE_ID)
+        print(GPS_PORTS)
+        if GPS_PORTS != []:
+            print('GPS DEVICE FOUND')
+            gps_port = GPS_PORTS[0] # select first device
+        else:
+            print('NO RIGHT GPS DEVICE FOUND')
 
-            # GPS receiver
-            gps_ser = serial.Serial(gps_port, baudrate=9600, timeout=0.5)
-        
+        # GPS receiver
+        gps_ser = serial.Serial(gps_port, baudrate=9600, timeout=0.5)
 
         # Schedule task for C2D Listener
         listeners = asyncio.gather(receiveGPS(module_client, gps_ser))
@@ -158,4 +151,4 @@ async def main():
 
 if __name__ == "__main__":
     # If using Python 3.7 or above, you can use following code instead:
-    asyncio.run(main())
+     asyncio.run(main())
