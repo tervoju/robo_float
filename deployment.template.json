@@ -71,33 +71,17 @@
               "image": "${MODULES.GPSReader}",
               "createOptions": {
                 "HostConfig": {
-                  "Privileged": true
+                  "Privileged": true,
+                  "Binds": [
+
+                    "/dev:/dev",
+
+                    "/run/udev:/run/udev:ro"
+
+                  ],
+                  "NetworkMode": "host"
                 }
               }
-            }
-          },
-          "CANReader": {
-            "version": "1.0",
-            "type": "docker",
-            "status": "running",
-            "restartPolicy": "always",
-            "settings": {
-              "image": "${MODULES.CANReader}",
-              "createOptions": {
-                "HostConfig": {
-                  "Privileged": true
-                }
-              }
-            }
-          },
-          "CANDataHandler": {
-            "version": "1.0",
-            "type": "docker",
-            "status": "running",
-            "restartPolicy": "always",
-            "settings": {
-              "image": "${MODULES.CANDataHandler}",
-              "createOptions": {}
             }
           }
         }
@@ -107,10 +91,8 @@
       "properties.desired": {
         "schemaVersion": "1.0",
         "routes": {
-          "GPSReaderToIoTHub": "FROM /messages/modules/GPSReader/outputs/* INTO $upstream",
-          "CANReaderToCANDataHandler": "FROM /messages/modules/CANReader/outputs/CANoutput INTO BrokeredEndpoint(\"/modules/CANDataHandler/inputs/input1\")",
-          "CANDataHandlerToIoTHub": "FROM /messages/modules/CANDataHandler/outputs/* INTO $upstream"
-        },
+          "GPSReaderToIoTHub": "FROM /messages/modules/GPSReader/outputs/* INTO $upstream"
+       },
         "storeAndForwardConfiguration": {
           "timeToLiveSecs": 7200
         }
